@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>質問箱</title>
+  <style>
+    body { font-family: sans-serif; max-width: 720px; margin: 24px auto; padding: 0 16px; line-height: 1.6; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+    label { display: block; font-weight: bold; margin-top: 10px; }
+    input, select, textarea, button { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; font-size: 15px; }
+    textarea { min-height: 100px; }
+    button { margin-top: 14px; cursor: pointer; font-weight: bold; }
+    .qa-item { border-top: 1px solid #eee; padding: 12px 0; }
+    .meta { font-size: 13px; color: #555; }
+    .answer { background: #f7f9fc; padding: 10px; border-radius: 6px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>質問箱</h1>
+
+  <div class="card">
+    <h2>質問を送る</h2>
+    <form id="questionForm">
+      <label for="subject">科目</label>
+      <select id="subject" name="subject">
+        <option value="日本史探究">日本史探究</option>
+        <option value="地理総合">地理総合</option>
+        <option value="世界史探究">世界史探究</option>
+        <option value="公共">公共</option>
+        <option value="倫理・政治・経済">倫理・政治・経済</option>
+        <option value="その他">その他</option>
+      </select>
+
+      <label for="nickname">ニックネーム（任意・空欄なら「匿名」）</label>
+      <input id="nickname" name="nickname" type="text" maxlength="20" placeholder="例：匿名希望" />
+
+      <label for="question">質問内容（500文字以内）</label>
+      <textarea id="question" name="question" maxlength="500" required placeholder="授業で分からなかったことや、聞いてみたいことを書いてください"></textarea>
+
+      <button type="submit" id="submitBtn">送信する</button>
+      <p id="formMessage"></p>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>みんなのQ&A（公開中）</h2>
+    <label for="filterSubject">科目で絞り込み</label>
+    <select id="filterSubject">
+      <option value="すべて">すべて</option>
+      <option value="日本史探究">日本史探究</option>
+      <option value="地理総合">地理総合</option>
+      <option value="世界史探究">世界史探究</option>
+      <option value="公共">公共</option>
+      <option value="倫理・政治・経済">倫理・政治・経済</option>
+      <option value="その他">その他</option>
+    </select>
+    <div id="qaList" style="margin-top: 12px;">読み込み中...</div>
+  </div>
+
+  <script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbybrdI4gy4v32jL8FyYFyPK5H1i5thL5UVtLrZkcA8OJjk91CY9RPa7YPHbq3GImbha/exec';
+
+    const form = document.getElementById('questionForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const formMessage = document.getElementById('formMessage');
+    const filterSubject = document.getElementById('filterSubject');
+    const qaList = document.getElementById('qaList');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      formMessage.textContent = '送信中...';
+
+      const payload = {
+        subject: document.getElementById('subject').value,
+        nickname: document.getElementById('nickname').value,
+        question: document.getElementById('question').value
+      };
+
+      try {
+        const res = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          formMessage.textContent = data.message || '送信しました！';
+          form.reset();
+        } else {
+          formMessage.textContent = data.error || '送信に失敗しました。';
+        }
+      } catch (err) {
+        formMessage.textContent = '通信エラーが発生しました。';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    async function loadQa() {
+      const subject = filterSubject.value;
+      qaList.textContent = '読み込み中...';
+      try {
+        const res = await fetch(`${GAS_URL}?subject=${encodeURIComponent(subject)}`);
+        const data = await res.json();
+        if (!data.ok) {
+          qaList.textContent = data.error || '取得に失敗しました。';
+          return;
+        }
+        if (!data.items || data.items.length === 0) {
+          qaList.textContent = '公開中のQ&Aはまだありません。';
+          return;
+        }
+        qaList.innerHTML = data.items.map((item) => `
+          <div class="qa-item">
+            <div class="meta">[${escapeHtml(item.subject)}] ${escapeHtml(item.nickname)} ／ ${escapeHtml(item.createdAt)}</div>
+            <div><strong>Q:</strong> ${escapeHtml(item.question)}</div>
+            <div class="answer"><strong>A:</strong> ${escapeHtml(item.answer)}</div>
+          </div>
+        `).join('');
+      } catch (err) {
+        qaList.textContent = 'Q&Aの読み込みに失敗しました。';
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    filterSubject.addEventListener('change', loadQa);
+    loadQa();
+  </script>
+</body>
+</html>
