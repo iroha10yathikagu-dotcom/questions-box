@@ -7,10 +7,15 @@
   <style>
     body { font-family: sans-serif; max-width: 720px; margin: 24px auto; padding: 0 16px; line-height: 1.6; }
     .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-    label { display: block; font-weight: bold; margin-top: 10px; }
-    input, select, textarea, button { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; font-size: 15px; }
+    label.field-label { display: block; font-weight: bold; margin-top: 10px; }
+    input[type="text"], select, textarea, button { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; font-size: 15px; }
     textarea { min-height: 100px; }
     button { margin-top: 14px; cursor: pointer; font-weight: bold; }
+    .radio-group { margin-top: 6px; }
+    .radio-option { display: flex; align-items: flex-start; gap: 8px; margin-top: 6px; font-weight: normal; cursor: pointer; }
+    .radio-option input[type="radio"] { width: auto; margin: 4px 0 0 0; cursor: pointer; }
+    .helper-text { font-size: 13px; color: #555; margin: 6px 0 0 0; }
+    .helper-text.private-active { color: #b91c1c; font-weight: bold; }
     .qa-item { border-top: 1px solid #eee; padding: 12px 0; }
     .meta { font-size: 13px; color: #555; }
     .answer { background: #f7f9fc; padding: 10px; border-radius: 6px; margin-top: 6px; }
@@ -22,7 +27,7 @@
   <div class="card">
     <h2>質問を送る</h2>
     <form id="questionForm">
-      <label for="subject">科目</label>
+      <label class="field-label" for="subject">科目</label>
       <select id="subject" name="subject">
         <option value="日本史探究">日本史探究</option>
         <option value="地理総合">地理総合</option>
@@ -32,10 +37,25 @@
         <option value="その他">その他</option>
       </select>
 
-      <label for="nickname">ニックネーム（任意・空欄なら「匿名」）</label>
-      <input id="nickname" name="nickname" type="text" maxlength="20" placeholder="例：匿名希望" />
+      <div class="radio-group">
+        <span class="field-label">公開設定</span>
+        <label class="radio-option">
+          <input type="radio" name="visibility" value="public" checked />
+          <span>全体公開OK（みんなの質問一覧に載せる）</span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="visibility" value="private" />
+          <span>非公開希望（全体には載せず、授業内で解説・個別対応）</span>
+        </label>
+      </div>
 
-      <label for="question">質問内容（500文字以内）</label>
+      <label class="field-label" id="nicknameLabel" for="nickname">ニックネーム（任意・空欄なら「匿名」）</label>
+      <input id="nickname" name="nickname" type="text" maxlength="20" placeholder="例：匿名希望" />
+      <p id="nicknameHelp" class="helper-text">
+        全体公開OKの場合はニックネームや空欄で大丈夫です。
+      </p>
+
+      <label class="field-label" for="question">質問内容（500文字以内）</label>
       <textarea id="question" name="question" maxlength="500" required placeholder="授業で分からなかったことや、聞いてみたいことを書いてください"></textarea>
 
       <button type="submit" id="submitBtn">送信する</button>
@@ -44,8 +64,8 @@
   </div>
 
   <div class="card">
-    <h2>みんなのQ&A（公開中）</h2>
-    <label for="filterSubject">科目で絞り込み</label>
+    <h2>みんなのQ&amp;A（公開中）</h2>
+    <label class="field-label" for="filterSubject">科目で絞り込み</label>
     <select id="filterSubject">
       <option value="すべて">すべて</option>
       <option value="日本史探究">日本史探究</option>
@@ -66,16 +86,42 @@
     const formMessage = document.getElementById('formMessage');
     const filterSubject = document.getElementById('filterSubject');
     const qaList = document.getElementById('qaList');
+    const nicknameInput = document.getElementById('nickname');
+    const nicknameLabel = document.getElementById('nicknameLabel');
+    const nicknameHelp = document.getElementById('nicknameHelp');
+    const visibilityRadios = document.querySelectorAll('input[name="visibility"]');
+
+    function updateNicknameGuide() {
+      const selected = document.querySelector('input[name="visibility"]:checked')?.value || 'public';
+      if (selected === 'private') {
+        nicknameLabel.textContent = 'お名前・出席番号（個別対応希望の場合）';
+        nicknameInput.placeholder = '例：〇〇（名前や出席番号）です';
+        nicknameHelp.textContent = '非公開希望の場合は、ニックネームではなく「〇〇（名前や出席番号）です」と書いてください。（空欄の場合は授業内で全体向けに解説します）';
+        nicknameHelp.classList.add('private-active');
+      } else {
+        nicknameLabel.textContent = 'ニックネーム（任意・空欄なら「匿名」）';
+        nicknameInput.placeholder = '例：匿名希望';
+        nicknameHelp.textContent = '全体公開OKの場合はニックネームや空欄で大丈夫です。';
+        nicknameHelp.classList.remove('private-active');
+      }
+    }
+
+    visibilityRadios.forEach((radio) => {
+      radio.addEventListener('change', updateNicknameGuide);
+    });
+    updateNicknameGuide();
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       submitBtn.disabled = true;
       formMessage.textContent = '送信中...';
 
+      const visibility = document.querySelector('input[name="visibility"]:checked')?.value || 'public';
       const payload = {
         subject: document.getElementById('subject').value,
-        nickname: document.getElementById('nickname').value,
-        question: document.getElementById('question').value
+        nickname: nicknameInput.value,
+        question: document.getElementById('question').value,
+        visibility: visibility
       };
 
       try {
@@ -89,6 +135,7 @@
         if (data.ok) {
           formMessage.textContent = data.message || '送信しました！';
           form.reset();
+          updateNicknameGuide();
         } else {
           formMessage.textContent = data.error || '送信に失敗しました。';
         }
